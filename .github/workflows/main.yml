@@ -35,25 +35,48 @@ jobs:
 
       - name: Update ECS Service
         run: |
-          # Update ECS service with the new image
-          ecs_cluster_name="php-cluster"
-          ecs_service_name="node-service"
-          image_uri="688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest"
+          # Set variables
+          ECS_CLUSTER_NAME="php-cluster"
+          ECS_SERVICE_NAME="node-service"
+          TASK_DEFINITION_NAME="node-task"
+          IMAGE_URI="688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest"
           
-          # Create a new task definition based on existing one
-          task_definition=$(aws ecs describe-task-definition --task-definition $ecs_service_name)
-          
-          new_task_definition=$(echo $task_definition | jq '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[] | .image = "'"$image_uri"'"]}')
-          
-          # Register the new task definition
-          new_task_definition_arn=$(aws ecs register-task-definition \
-            --family $(echo $new_task_definition | jq -r .family) \
-            --container-definitions "$(echo $new_task_definition | jq -r .containerDefinitions)" \
+          # Describe the current task definition
+          TASK_DEF_ARN=$(aws ecs describe-task-definition \
+            --task-definition $TASK_DEFINITION_NAME \
+            --region ap-northeast-1 \
             --query "taskDefinition.taskDefinitionArn" \
             --output text)
-          
-          # Update the ECS service to use the new task definition
+
+          if [ "$TASK_DEF_ARN" == "None" ]; then
+            echo "Error: Task Definition $TASK_DEFINITION_NAME not found!"
+            exit 1
+          fi
+
+          echo "Current task definition ARN: $TASK_DEF_ARN"
+
+          # Create new task definition based on existing one
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition $TASK_DEFINITION_NAME \
+            --region ap-northeast-1)
+
+          # Update image in container definitions
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[] | .image = "'"$IMAGE_URI"'"]}')
+
+          # Register the new task definition
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --family $(echo $NEW_TASK_DEF | jq -r .family) \
+            --container-definitions "$(echo $NEW_TASK_DEF | jq -r .containerDefinitions)" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "New task definition ARN: $NEW_TASK_DEF_ARN"
+
+          # Update ECS service with the new task definition
           aws ecs update-service \
-            --cluster $ecs_cluster_name \
-            --service $ecs_service_name \
-            --task-definition $new_task_definition_arn
+            --cluster $ECS_CLUSTER_NAME \
+            --service $ECS_SERVICE_NAME \
+            --task-definition $NEW_TASK_DEF_ARN \
+            --region ap-northeast-1
+
+          echo "ECS service updated with the new task definition."
