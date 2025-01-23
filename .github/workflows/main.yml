@@ -60,8 +60,8 @@ jobs:
             --task-definition $TASK_DEFINITION_NAME \
             --region ap-northeast-1)
 
-          # Update image in container definitions
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[] | .image = "'"$IMAGE_URI"'"]}')
+          # Update image in container definitions and add memory specification
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[] | .image = "'"$IMAGE_URI"'", .memory = 512, .memoryReservation = 256]}')
 
           # Register the new task definition
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
