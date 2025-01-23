@@ -1,4 +1,4 @@
-name: php CI/CD Pipeline
+name: node CI/CD Pipeline
 
 on:
   push:
