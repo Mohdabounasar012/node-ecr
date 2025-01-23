@@ -1,4 +1,4 @@
-name: Node CI/CD Pipeline
+name: node CI/CD Pipeline
 
 on:
   push:
@@ -24,60 +24,10 @@ jobs:
         with:
           registry: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com  # ECR registry to log in to
 
-      - name: Build Docker image
+      - name: Build php Docker image
         run: |
           docker build -t node-ecr-server .
           docker tag node-ecr-server:latest 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
-
-      - name: Push Docker image to ECR
+      - name: Push php Docker image to ECR
         run: |
           docker push 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
-
-      - name: Update ECS Service
-        run: |
-          # Set variables
-          ECS_CLUSTER_NAME="php-cluster"
-          ECS_SERVICE_NAME="node-service"
-          TASK_DEFINITION_NAME="node-task"
-          IMAGE_URI="688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest"
-          UNIQUE_CONTAINER_NAME="node-container-${GITHUB_SHA}"  # Unique container name using commit SHA
-          
-          # Describe the current task definition
-          TASK_DEF_ARN=$(aws ecs describe-task-definition \
-            --task-definition $TASK_DEFINITION_NAME \
-            --region ap-northeast-1 \
-            --query "taskDefinition.taskDefinitionArn" \
-            --output text)
-
-          if [ "$TASK_DEF_ARN" == "None" ]; then
-            echo "Error: Task Definition $TASK_DEFINITION_NAME not found!"
-            exit 1
-          fi
-
-          echo "Current task definition ARN: $TASK_DEF_ARN"
-
-          # Create new task definition based on existing one
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition $TASK_DEFINITION_NAME \
-            --region ap-northeast-1)
-
-          # Update image in container definitions and add memory specification
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[] | .image = "'"$IMAGE_URI"'", .memory = 512, .memoryReservation = 256, .name = "'"$UNIQUE_CONTAINER_NAME"'"]}')
-
-          # Register the new task definition
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --family $(echo $NEW_TASK_DEF | jq -r .family) \
-            --container-definitions "$(echo $NEW_TASK_DEF | jq -r .containerDefinitions)" \
-            --query "taskDefinition.taskDefinitionArn" \
-            --output text)
-
-          echo "New task definition ARN: $NEW_TASK_DEF_ARN"
-
-          # Update ECS service with the new task definition
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER_NAME \
-            --service $ECS_SERVICE_NAME \
-            --task-definition $NEW_TASK_DEF_ARN \
-            --region ap-northeast-1
-
-          echo "ECS service updated with the new task definition."
