@@ -1,4 +1,4 @@
-name: node CI/CD Pipeline
+name: Node CI/CD Pipeline
 
 on:
   push:
@@ -24,11 +24,36 @@ jobs:
         with:
           registry: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com  # ECR registry to log in to
 
-      - name: Build php Docker image
+      - name: Build Docker image
         run: |
           docker build -t node-ecr-server .
           docker tag node-ecr-server:latest 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
 
-      - name: Push php Docker image to ECR
+      - name: Push Docker image to ECR
         run: |
           docker push 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
+
+      - name: Update ECS Service
+        run: |
+          # Update ECS service with the new image
+          ecs_cluster_name="php-cluster"
+          ecs_service_name="node-service"
+          image_uri="688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest"
+          
+          # Create a new task definition based on existing one
+          task_definition=$(aws ecs describe-task-definition --task-definition $ecs_service_name)
+          
+          new_task_definition=$(echo $task_definition | jq '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[] | .image = "'"$image_uri"'"]}')
+          
+          # Register the new task definition
+          new_task_definition_arn=$(aws ecs register-task-definition \
+            --family $(echo $new_task_definition | jq -r .family) \
+            --container-definitions "$(echo $new_task_definition | jq -r .containerDefinitions)" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+          
+          # Update the ECS service to use the new task definition
+          aws ecs update-service \
+            --cluster $ecs_cluster_name \
+            --service $ecs_service_name \
+            --task-definition $new_task_definition_arn
