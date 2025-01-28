@@ -53,14 +53,14 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: node-ecr-server  # Container name in the task definition
-          image: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest  # Updated image URL
+          container-name: node-container  # Correct container name from your task definition
+          image: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
 
       # Deploy the updated task definition to ECS
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.update-task.outputs.task-definition }}
-          service: node-service1  # ECS service name
+          service: node-services  # ECS service name
           cluster: node-cluster  # ECS cluster name
-          wait-for-service-stability: true  # Wait until ECS service is stable
+          wait-for-service-stability: true
