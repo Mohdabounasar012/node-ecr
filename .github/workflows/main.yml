@@ -1,4 +1,4 @@
-name: node CI/CD Pipeline
+name: Build and Push Docker Image to ECR
 
 on:
   push:
@@ -6,8 +6,9 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -17,23 +18,24 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1  # Correct input name for region
+          aws-region: ap-northeast-1
 
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          registry: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com  # ECR registry to log in to
+          registry: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com
 
-      - name: Build php Docker image
-        run: |
-          docker build -t node-ecr-server .
-          docker tag node-ecr-server:latest 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
-      - name: Push php Docker image to ECR
-        run: |
-          docker push 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
-      - name: Deploy to ECS
-        run: |
-          aws ecs update-service \
-            --cluster node-cluster \
-            --service node-services \
-            --force-new-deployment
+      - name: Build and push Docker image to ECR
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile  # Optional
+          push: true
+          tags: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
+          
+      #- name: Deploy to ECS
+        #run: |
+          #aws ecs update-service \
+            #--cluster node-cluster \
+            #--service node-services \
+            #--force-new-deployment
