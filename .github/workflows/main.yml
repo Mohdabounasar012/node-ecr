@@ -20,13 +20,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # Log in to Amazon ECR
+      # Log in to Amazon ECR 
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          registry: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com
+          registry: ${{ secrets.ECR_REGISTRY }}
 
       # Build and push Docker image to ECR
       - name: Build and push Docker image to ECR
@@ -35,14 +35,14 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
+          tags: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
       # Download the current ECS task definition
       - name: Download task definition
         id: download-task
         run: |
           aws ecs describe-task-definition \
-            --task-definition node-task \
+            --task-definition ${{ secrets.TASK_DEFINITION_NAME }} \
             --query taskDefinition \
             --output json > task-definition.json
           echo "task-definition=task-definition.json" >> $GITHUB_OUTPUT
@@ -53,14 +53,14 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: node-container  # Correct container name from your task definition
-          image: 688567291323.dkr.ecr.ap-northeast-1.amazonaws.com/node-ecr-server:latest
+          container-name: ${{ secrets.CONTAINER_NAME }}  # Correct container name from your task definition
+          image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
       # Deploy the updated task definition to ECS
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.update-task.outputs.task-definition }}
-          service: node-service2  # ECS service name
-          cluster: node-cluster  # ECS cluster name
+          service: ${{ secrets.ECS_SERVICE }}  # ECS service name
+          cluster: ${{ secrets.ECS_CLUSTER }}  # ECS cluster name
           wait-for-service-stability: true
